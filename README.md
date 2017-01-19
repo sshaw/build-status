@@ -4,6 +4,10 @@ Minor mode that shows a buffer's build status in the mode line.
 
 **Currently only supports CircleCI; pull requests welcome!**
 
+![build-status example passing](example1.png)
+
+![build-status example failing](example2.png)
+
 ## Usage
 
 `M-x build-status-mode` in a buffer that's part of a CI project.
@@ -27,8 +31,7 @@ The buffer or one of its descendant directories must contain a `circle.yml` file
 
 ## TODOs
 
-* Custom colors
-* Automatic disabling
+* Custom colors`
 * TravisCI
 * Other services
 
