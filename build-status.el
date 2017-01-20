@@ -139,7 +139,7 @@ If `FILENAME' is not part of a CI project return nil."
       (cdr (assoc 'outcome (elt json 0))))))
 
 (defun build-status--update-status ()
-  (let ((buffers (mapcar (lambda (b) (buffer-file-name)) (buffer-list)))
+  (let ((buffers (mapcar (lambda (b) (buffer-file-name b)) (buffer-list)))
         config
         project)
 
