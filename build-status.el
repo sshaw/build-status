@@ -70,18 +70,18 @@
                                     looking-for)))))
 
 (defun build-status--any-open-buffers (root buffers)
-  (cl-find root
-           buffers
-           :test (lambda (start-with buffer)
-                   (eq t
-                       ;; prefer compare-string as it's not strict with bounds like substring
-                       (compare-strings start-with 0 (length start-with)
-                                        (or buffer "") 0 (length start-with))))))
+  (stringp (cl-find root
+                    buffers
+                    :test (lambda (start-with buffer)
+                            (eq t
+                                ;; prefer compare-string as it's not strict with bounds like substring
+                                (compare-strings start-with 0 (length start-with)
+                                                 (or buffer "") 0 (length start-with)))))))
 
 (defun build-status--project (filename)
   "Return a list containing information on `FILENAME''s CI project.
 The list contains:
-CI service, project root directory, SCM service, username, project, branch.
+CI service, api token, project root directory, VCS service, username, project, branch.
 
 If `FILENAME' is not part of a CI project return nil."
   (let ((root (build-status--circle-ci-project-root filename))
@@ -93,8 +93,8 @@ If `FILENAME' is not part of a CI project return nil."
       (setq remote (build-status--remote root branch))
       (when (string-match build-status--remote-regex remote)
         (list 'circleci
-              ;;(or (build-status--git "-C" root "config" "--get" "build-status.api-token")
-              build-status-circle-ci-token
+              (or (ignore-errors (build-status--git "-C" root "config" "--get" "build-status.api-token"))
+                  build-status-circle-ci-token)
               root
               (match-string 1 remote)
               (match-string 2 remote)
@@ -123,13 +123,13 @@ If `FILENAME' is not part of a CI project return nil."
 
 (defun build-status--circle-ci-status (project)
   (let* ((url (apply 'format "https://circleci.com/api/v1.1/project/%s/%s/%s/tree/%s?limit=1&circle-token=%s"
-		     `(,@(cdddr project) ,build-status-circle-ci-token)))
+		     `(,@(cdddr project) ,(nth 1 project))))
 	 (url-request-method "GET")
 	 (url-request-extra-headers '(("Content-Type" . "application/json")))
          json)
-    (with-current-buffer (url-retrieve-synchronously url)
+    (with-current-buffer (url-retrieve-synchronously url t t)
       ;;(message "%s\n%s" url (buffer-substring-no-properties 1 (point-max)))
-
+      (goto-char (point-min))
       (when (and (search-forward-regexp "HTTP/1\\.[01] \\([0-9]\\{3\\}\\)")
                  (not (string= (match-string 1) "200")))
         (error "CircleCI request failed with HTTP status %s" (match-string 1)))
@@ -202,7 +202,7 @@ If `FILENAME' is not part of a CI project return nil."
           (setq build-status--project-status-alist
                 (delete (assoc root build-status--project-status-alist)
                         build-status--project-status-alist))
-          ;; Only disable the mode if we have no more projects in the list
+          ;; Only remove from the mode line if there are no more projects
           (when (null build-status--project-status-alist)
             (delq 'build-status--mode-line-string global-mode-string)))
 

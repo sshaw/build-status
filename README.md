@@ -13,7 +13,7 @@ Minor mode that shows a buffer's build status in the mode line.
 `M-x build-status-mode` in a buffer that's part of a CI project.
 
 By default the build status will be checked every 5 minutes. To change this
-set `build-status-check-interval` to the desired time, in seconds.
+set `build-status-check-interval` to the desired interval, in seconds.
 
 API keys can be set via the service-specific variable (see below) or via `git config`:
 
@@ -31,8 +31,7 @@ The buffer or one of its descendant directories must contain a `circle.yml` file
 
 ## TODOs
 
-* Custom colors`
-* TravisCI
+* Custom colors
 * Other services
 
 ## See Also
