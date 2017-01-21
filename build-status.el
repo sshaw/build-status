@@ -147,7 +147,9 @@ If `FILENAME' is not part of a CI project return nil."
       (setq config (assoc root build-status--project-status-alist))
       (setq project (build-status--project root))
       (if (and project (build-status--any-open-buffers root buffers))
-          (setcdr config (list (build-status--circle-ci-status project)))
+          (condition-case e
+              (setcdr config (list (build-status--circle-ci-status project)))
+            (error (message "Failed to update status for %s: %s" root (cadr e))))
         (setq build-status--project-status-alist
               (delete config build-status--project-status-alist)))))
 
