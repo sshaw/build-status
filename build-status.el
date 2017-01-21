@@ -33,11 +33,36 @@
 (require 'json)
 (require 'url)
 
-(defvar build-status-circle-ci-token nil
-  "CircleCI API token.")
-
 (defvar build-status-check-interval 300
   "Interval at which to check the build status.  Given in seconds, defaults to 300.")
+
+(defvar build-status-color-alist
+  '(("passed"
+     ((background-color . "green")))
+    ("failed"
+     ((background-color . "red")))
+    ("running"
+     ((background-color . "yellow"))))
+  "Alist of statuses and the face properties to use when displayed.
+Each element looks like (STATUS PROPERTIES).  STATUS is a status
+string (one of: passed, failed, running, or unknown) and PROPERTIES
+is a list of text property cons.")
+
+(defvar build-status-circle-ci-token nil
+  "CircleCI API token.
+The API token can also be sit via: `git config --add build-status.api-token`.")
+
+(defvar build-status-circle-ci-status-mapping-alist
+  '(("success"   . "passed")
+    ("scheduled" . "queued"))
+  "Alist of CircleCI status to build-status statuses. build-status statuses are:
+passed, failed, running.")
+
+(defvar build-status-travis-ci-status-mapping-alist
+  '(("started" . "running")
+    ("created" . "queued"))  ;; need to actually handle this state
+  "Alist of TravsCI status to build-status statuses.  build-status statuses are:
+passed, failed, running.")
 
 (defvar build-status--project-status-alist '()
   "Alist of project roots and their build status.")
@@ -104,6 +129,9 @@ If `FILENAME' is not part of a CI project return nil."
 (defun build-status--circle-ci-project-root (path)
   (build-status--project-root path "circle.yml"))
 
+(defun build-status--travis-ci-project-root (path)
+  (build-status--project-root path ".travis.yml"))
+
 (defun build-status-open-circle-ci ()
   "Open the CircleCI web page for the project."
   (interactive)
@@ -126,7 +154,8 @@ If `FILENAME' is not part of a CI project return nil."
 		     `(,@(cdddr project) ,(nth 1 project))))
 	 (url-request-method "GET")
 	 (url-request-extra-headers '(("Content-Type" . "application/json")))
-         json)
+         json
+         status)
     (with-current-buffer (url-retrieve-synchronously url t t)
       ;;(message "%s\n%s" url (buffer-substring-no-properties 1 (point-max)))
       (goto-char (point-min))
@@ -136,7 +165,11 @@ If `FILENAME' is not part of a CI project return nil."
 
       (search-forward-regexp "\n\n")
       (setq json (json-read))
-      (cdr (assoc 'outcome (elt json 0))))))
+      ;; If the build is running there's no outcome so we check status
+      (setq status (or (cdr (assoc 'outcome (elt json 0)))
+                       (cdr (assoc 'status  (elt json 0)))))
+      (or (cdr (assoc status build-status-circle-ci-status-mapping-alist))
+          status))))
 
 (defun build-status--update-status ()
   (let ((buffers (mapcar (lambda (b) (buffer-file-name b)) (buffer-list)))
@@ -157,6 +190,14 @@ If `FILENAME' is not part of a CI project return nil."
   (setq build-status--timer
         (run-at-time build-status-check-interval nil 'build-status--update-status)))
 
+(defun build-status--propertize (lighter status)
+  (let ((color (cadr (assoc status build-status-color-alist))))
+    (propertize (if color (concat " " lighter " ") lighter)
+                'help-echo (concat "Build status: " status)
+                'local-map build-status--mode-line-map
+                'mouse-face 'mode-line-highlight
+                'face color)))
+
 (defcustom build-status--mode-line-string
   '(:eval
     (let* ((root (build-status--circle-ci-project-root (buffer-file-name)))
@@ -165,22 +206,14 @@ If `FILENAME' is not part of a CI project return nil."
           ""
         (concat " "
                 (cond
-                 ((string= status "success")
-                  (propertize " P "
-                              'help-echo (concat "Build is passing")
-                              'local-map build-status--mode-line-map
-                              'mouse-face 'mode-line-highlight
-                              'face '(background-color . "green3")))
+                 ((string= status "passed")
+                  (build-status--propertize "P" status))
+                 ((string= status "running")
+                  (build-status--propertize "R" status))
                  ((string= status "failed")
-                  (propertize " F "
-                              'help-echo (concat "Build is failing")
-                              'local-map build-status--mode-line-map
-                              'mouse-face 'mode-line-highlight
-                              'face '(background-color . "red")))
+                  (build-status--propertize "F" status))
                  (t
-                  (propertize " ? "
-                              'help-echo (concat "Build status is " (or status "unknown"))
-                              'face '(background-color . "yellow4"))))))))
+                  (build-status--propertize "?" (or status "unknown"))))))))
   "Build status mode line string."
   :type 'sexp
   :risky t)
@@ -207,7 +240,6 @@ If `FILENAME' is not part of a CI project return nil."
           ;; Only remove from the mode line if there are no more projects
           (when (null build-status--project-status-alist)
             (delq 'build-status--mode-line-string global-mode-string)))
-
 
       (when (null (nth 1 project))
         (setq build-status-mode nil)
