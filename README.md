@@ -1,8 +1,6 @@
 # build-status
 
-Minor mode that shows a buffer's build status in the mode line.
-
-**Currently only supports CircleCI with GitHub and maybe Bitbucket; pull requests welcome!**
+Emacs minor mode that shows a buffer's build status in the mode line.
 
 ![build-status example passing](example1.png)
 
@@ -21,6 +19,9 @@ API tokens can be set via the service-specific variable (see below) or via `git 
 git config --add build-status.api-token TOKEN
 ```
 
+To open the CI service's web page click on the mode's lighter or
+run `M-x build-status-open`.
+
 ### Status Text Properties
 
 Each status has associated text properties. These are configured
@@ -37,7 +38,9 @@ via `build-status-color-alist`. By default it contains:
 
 Each value is a list of text (`face`) properties. Set them as you see fit.
 
-### CircleCI
+### Supported Services
+
+#### CircleCI
 
 ```el
 (setq build-status-circle-ci-token "YOUR-TOKEN")
@@ -45,11 +48,21 @@ Each value is a list of text (`face`) properties. Set them as you see fit.
 
 The buffer or one of its descendant directories must contain a `circle.yml` file.
 
+#### Travis CI
+
+Pro and Enterprise not supported. Pull requests welcome!
+
+```el
+(setq build-status-travis-ci-token "YOUR-TOKEN")
+```
+
+The buffer or one of its descendant directories must contain a `.travis.yml` file.
+
 ## TODOs
 
-* Status for queued state
-* TravisCI (somewhat in progress)
-* Other services
+* Status for queued state (maybe)
+* Pro and Enterprise TravisCI
+* Support for AppVeyor
 
 ## See Also
 

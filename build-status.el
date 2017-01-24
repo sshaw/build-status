@@ -2,7 +2,7 @@
 
 ;; Author: Skye Shaw <skye.shaw@gmail.com>
 ;; Version: 0.0.1
-;; Keywords: mode-line, ci, circleci
+;; Keywords: mode-line, ci, circleci, travis-ci
 ;; Package-Requires: ((cl-lib "0.5"))
 ;; URL: http://github.com/sshaw/build-status
 
@@ -52,6 +52,10 @@ is a list of text property cons.")
   "CircleCI API token.
 The API token can also be sit via: `git config --add build-status.api-token`.")
 
+(defvar build-status-travis-ci-token nil
+  "Travis CI API token.
+The API token can also be sit via: `git config --add build-status.api-token`.")
+
 (defvar build-status-circle-ci-status-mapping-alist
   '(("success"   . "passed")
     ("scheduled" . "queued"))
@@ -59,7 +63,8 @@ The API token can also be sit via: `git config --add build-status.api-token`.")
 passed, failed, running.")
 
 (defvar build-status-travis-ci-status-mapping-alist
-  '(("started" . "running")
+  '(("errored" . "failed")
+    ("started" . "running")
     ("created" . "queued"))  ;; need to actually handle this state
   "Alist of TravsCI status to build-status statuses.  build-status statuses are:
 passed, failed, running.")
@@ -72,14 +77,35 @@ passed, failed, running.")
   "\\(github\\|bitbucket\\).com\\(?:/\\|:[0-9]*/?\\)\\([^/]+\\)/\\([^/]+?\\)\\(?:\\.git\\)?$")
 
 (defvar build-status--mode-line-map (make-sparse-keymap))
-(define-key build-status--mode-line-map [mode-line mouse-1] 'build-status-open-circle-ci)
+(define-key build-status--mode-line-map [mode-line mouse-1] 'build-status-open)
 
 (defun build-status--git(&rest args)
   (car (apply 'process-lines `("git" ,@(when args args)))))
 
+(defun build-status--config (path setting)
+  ;; Non-zero exit if config doesn't exist, ignore it.
+  (ignore-errors (build-status--git "-C" path "config" "--get" setting)))
+
 (defun build-status--remote (path branch)
-  (let ((remote (build-status--git "-C" path "config" "--get" (format "branch.%s.remote" branch))))
-    (build-status--git "-C" path "config" "--get" (format "remote.%s.url" remote))))
+  (let* ((get-remote (lambda (path branch)
+                       (build-status--config path (format "branch.%s.remote" branch))))
+         (remote (funcall get-remote path branch)))
+
+    ;; From git-link.
+    ;;
+    ;; Git defaults to "." if the branch has no remote.
+    ;; If the branch has no remote we try master's, which may be set.
+    ;; Otherwise, we default to origin.
+    (if (or (null remote)
+            (and (string= remote ".")
+                 (not (string= branch "master"))))
+        (setq remote (funcall get-remote path "master")))
+
+    (when (or (null remote)
+              (string= remote "."))
+      (setq remote "origin"))
+
+    (build-status--config path (format "remote.%s.url" remote))))
 
 (defun build-status--branch (path)
   (build-status--git "-C" path "symbolic-ref" "--short" "HEAD"))
@@ -109,17 +135,21 @@ The list contains:
 CI service, api token, project root directory, VCS service, username, project, branch.
 
 If `FILENAME' is not part of a CI project return nil."
-  (let ((root (build-status--circle-ci-project-root filename))
-        branch
-        remote)
+  (let (branch project remote root token)
+    (cond
+     ((setq root (build-status--circle-ci-project-root filename))
+      (setq project 'circle-ci)
+      (setq token build-status-circle-ci-token))
+     ((setq root (build-status--travis-ci-project-root filename))
+      (setq project 'travis-ci)
+      (setq token build-status-travis-ci-token)))
 
     (when root
       (setq branch (build-status--branch root))
       (setq remote (build-status--remote root branch))
-      (when (string-match build-status--remote-regex remote)
-        (list 'circleci
-              (or (ignore-errors (build-status--git "-C" root "config" "--get" "build-status.api-token"))
-                  build-status-circle-ci-token)
+      (when (and remote (string-match build-status--remote-regex remote))
+        (list project
+              (or (build-status--config root "build-status.api-token") token)
               root
               (match-string 1 remote)
               (match-string 2 remote)
@@ -132,44 +162,75 @@ If `FILENAME' is not part of a CI project return nil."
 (defun build-status--travis-ci-project-root (path)
   (build-status--project-root path ".travis.yml"))
 
-(defun build-status-open-circle-ci ()
-  "Open the CircleCI web page for the project."
-  (interactive)
-  (let ((project (build-status--project (buffer-file-name)))
-        root
-        url)
+(defun build-status--circle-ci-url (project)
+  (let ((root (if (string= "github" (nth 3 project)) "gh" "bb")))
+    ;; "bb" here is just a guess for Bitbucket :)
+    (format "https://circleci.com/%s/%s/%s/tree/%s"
+            root
+            (nth 4 project)
+            (nth 5 project)
+            (nth 6 project))))
 
-    (when project
-      ;; "bb" here is just a guess for Bitbucket :)
-      (setq root (if (string= "github" (nth 3 project)) "gh" "bb"))
-      (setq url  (format "https://circleci.com/%s/%s/%s/tree/%s"
-                         root
-                         (nth 4 project)
-                         (nth 5 project)
-                         (nth 6 project)))
-      (browse-url url))))
+(defun build-status--travis-ci-url (project)
+  (let* ((json (build-status--travis-ci-status-request project))
+         (build (cdr (assq 'id (assq 'branch json)))))
+    (format "https://travis-ci.org/%s/%s/builds/%s"
+            (nth 4 project)
+            (nth 5 project)
+            build)))
 
-(defun build-status--circle-ci-status (project)
-  (let* ((url (apply 'format "https://circleci.com/api/v1.1/project/%s/%s/%s/tree/%s?limit=1&circle-token=%s"
-		     `(,@(cdddr project) ,(nth 1 project))))
-	 (url-request-method "GET")
-	 (url-request-extra-headers '(("Content-Type" . "application/json")))
-         json
-         status)
-    (with-current-buffer (url-retrieve-synchronously url t t)
-      ;;(message "%s\n%s" url (buffer-substring-no-properties 1 (point-max)))
+(defun build-status--http-request (url)
+  "Make an HTTP request to `URL', parse the JSON response and return it.
+Signals an error if the response does not contain an HTTP 200 status code."
+  (with-current-buffer (url-retrieve-synchronously url)
+      (message "%s\n%s" url (buffer-substring-no-properties 1 (point-max)))
       (goto-char (point-min))
       (when (and (search-forward-regexp "HTTP/1\\.[01] \\([0-9]\\{3\\}\\)")
-                 (not (string= (match-string 1) "200")))
-        (error "CircleCI request failed with HTTP status %s" (match-string 1)))
+                  (not (string= (match-string 1) "200")))
+         (error "Request to %s failed with HTTP status %s" url (match-string 1)))
 
-      (search-forward-regexp "\n\n")
-      (setq json (json-read))
-      ;; If the build is running there's no outcome so we check status
-      (setq status (or (cdr (assoc 'outcome (elt json 0)))
-                       (cdr (assoc 'status  (elt json 0)))))
-      (or (cdr (assoc status build-status-circle-ci-status-mapping-alist))
-          status))))
+       (search-forward-regexp "\n\n")
+       (json-read)))
+
+(defun build-status--circle-ci-status (project)
+  "Get the Travis CI build status of `PROJECT'."
+  (let* ((url (apply 'format "https://circleci.com/api/v1.1/project/%s/%s/%s/tree/%s?limit=1&circle-token=%s"
+                    `(,@(cdddr project) ,(nth 1 project))))
+         (url-request-method "GET")
+         (url-request-extra-headers '(("Accept" . "application/json")))
+         (json (build-status--http-request url))
+         (status (or (cdr (assq 'outcome (elt json 0)))
+                     (cdr (assq 'status  (elt json 0))))))
+
+    (or (cdr (assq status build-status-circle-ci-status-mapping-alist))
+        status)))
+
+(defun build-status--travis-ci-request (url &optional token)
+  "Generic Travis CI request to `URL' using `TOKEN', if given."
+  (let ((url-request-method "GET")
+        (url-request-extra-headers '(("Accept" . "application/vnd.travis-ci.2+json"))))
+
+    (when token
+      (push (cons "Authorization" (format "token %s" token)) url-request-extra-headers))
+
+    (build-status--http-request url)))
+
+(defun build-status--travis-ci-status-request (project)
+  "Get the Travis CI build status of `PROJECT'."
+  (let ((url (format "https://api.travis-ci.org/repos/%s/%s/branches/%s"
+                     (nth 4 project)
+                     (nth 5 project)
+                     (nth 6 project)))
+        (token (nth 1 project)))
+
+    (build-status--travis-ci-request url token)))
+
+(defun build-status--travis-ci-status (project)
+  (let* ((json (build-status--travis-ci-status-request project))
+         (status (cdr (assq 'state (assq 'branch json)))))
+
+    (or (cdr (assq status build-status-travis-ci-status-mapping-alist))
+        status)))
 
 (defun build-status--update-status ()
   (let ((buffers (mapcar (lambda (b) (buffer-file-name b)) (buffer-list)))
@@ -181,7 +242,10 @@ If `FILENAME' is not part of a CI project return nil."
       (setq project (build-status--project root))
       (if (and project (build-status--any-open-buffers root buffers))
           (condition-case e
-              (setcdr config (list (build-status--circle-ci-status project)))
+              (setcdr config (list
+                              (if (eq (car project) 'circle-ci)
+                                  (build-status--circle-ci-status project)
+                                (build-status--travis-ci-status project))))
             (error (message "Failed to update status for %s: %s" root (cadr e))))
         (setq build-status--project-status-alist
               (delete config build-status--project-status-alist)))))
@@ -200,7 +264,8 @@ If `FILENAME' is not part of a CI project return nil."
 
 (defcustom build-status--mode-line-string
   '(:eval
-    (let* ((root (build-status--circle-ci-project-root (buffer-file-name)))
+    (let* ((root (or (build-status--circle-ci-project-root (buffer-file-name))
+                     (build-status--travis-ci-project-root (buffer-file-name))))
            (status (cadr (assoc root build-status--project-status-alist))))
       (if (null status)
           ""
@@ -218,6 +283,15 @@ If `FILENAME' is not part of a CI project return nil."
   :type 'sexp
   :risky t)
 
+(defun build-status-open ()
+  "Open the CI service's web page for current project's branch."
+  (interactive)
+  (let ((project (build-status--project (buffer-file-name))))
+    (when project
+      (browse-url (if (eq 'circle-ci (car project))
+                    (build-status--circle-ci-url project)
+                    (build-status--travis-ci-url project))))))
+
 (define-minor-mode build-status-mode
   "Monitor the build status of the buffer's project."
   :global t
@@ -229,7 +303,7 @@ If `FILENAME' is not part of a CI project return nil."
 
     (when (null project)
       (setq build-status-mode nil)
-      (error "Not a CircleCI project"))
+      (error "Not a CI project"))
 
     (setq root (nth 2 project))
     (if (not build-status-mode)
@@ -240,10 +314,6 @@ If `FILENAME' is not part of a CI project return nil."
           ;; Only remove from the mode line if there are no more projects
           (when (null build-status--project-status-alist)
             (delq 'build-status--mode-line-string global-mode-string)))
-
-      (when (null (nth 1 project))
-        (setq build-status-mode nil)
-        (error "No CircleCI api token has been configured"))
 
       (add-to-list 'global-mode-string 'build-status--mode-line-string t)
       (add-to-list 'build-status--project-status-alist (list root nil))
