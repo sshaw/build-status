@@ -19,7 +19,7 @@ API tokens can be set via the service-specific variable (see below) or via `git 
 git config --add build-status.api-token TOKEN
 ```
 
-To open the CI service's web page click on the mode's lighter or
+To open the CI service's web page for buffer's build click on the mode's lighter or
 run `M-x build-status-open`.
 
 ### Status Text Properties
@@ -46,7 +46,7 @@ Each value is a list of text (`face`) properties. Set them as you see fit.
 (setq build-status-circle-ci-token "YOUR-TOKEN")
 ```
 
-The buffer or one of its descendant directories must contain a `circle.yml` file.
+The buffer's file or one of its descendant directories must contain a `circle.yml` file.
 
 #### Travis CI
 
@@ -56,12 +56,12 @@ Pro and Enterprise not supported. Pull requests welcome!
 (setq build-status-travis-ci-token "YOUR-TOKEN")
 ```
 
-The buffer or one of its descendant directories must contain a `.travis.yml` file.
+The buffer's file or one of its descendant directories must contain a `.travis.yml` file.
 
 ## TODOs
 
 * Status for queued state (maybe)
-* Pro and Enterprise TravisCI
+* Support for TravisCI Pro and Enterprise
 * Support for AppVeyor
 
 ## See Also

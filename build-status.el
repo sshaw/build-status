@@ -183,14 +183,14 @@ If `FILENAME' is not part of a CI project return nil."
   "Make an HTTP request to `URL', parse the JSON response and return it.
 Signals an error if the response does not contain an HTTP 200 status code."
   (with-current-buffer (url-retrieve-synchronously url)
-      (message "%s\n%s" url (buffer-substring-no-properties 1 (point-max)))
-      (goto-char (point-min))
-      (when (and (search-forward-regexp "HTTP/1\\.[01] \\([0-9]\\{3\\}\\)")
-                  (not (string= (match-string 1) "200")))
-         (error "Request to %s failed with HTTP status %s" url (match-string 1)))
+    ;; (message "%s\n%s" url (buffer-substring-no-properties 1 (point-max)))
+    (goto-char (point-min))
+    (when (and (search-forward-regexp "HTTP/1\\.[01] \\([0-9]\\{3\\}\\)")
+               (not (string= (match-string 1) "200")))
+      (error "Request to %s failed with HTTP status %s" url (match-string 1)))
 
-       (search-forward-regexp "\n\n")
-       (json-read)))
+    (search-forward-regexp "\n\n")
+    (json-read)))
 
 (defun build-status--circle-ci-status (project)
   "Get the Travis CI build status of `PROJECT'."
@@ -266,7 +266,7 @@ Signals an error if the response does not contain an HTTP 200 status code."
   '(:eval
     (let* ((root (or (build-status--circle-ci-project-root (buffer-file-name))
                      (build-status--travis-ci-project-root (buffer-file-name))))
-           (status (cadr (assoc root build-status--project-status-alist))))
+           (status (cdr (assoc root build-status--project-status-alist))))
       (if (null status)
           ""
         (concat " "
@@ -316,7 +316,7 @@ Signals an error if the response does not contain an HTTP 200 status code."
             (delq 'build-status--mode-line-string global-mode-string)))
 
       (add-to-list 'global-mode-string 'build-status--mode-line-string t)
-      (add-to-list 'build-status--project-status-alist (list root nil))
+      (add-to-list 'build-status--project-status-alist (cons root nil))
 
       (build-status--update-status))))
 
