@@ -25,7 +25,7 @@
 
 ;;; Commentary:
 
-;; Minor mode that shows a buffer's build status in the mode line.
+;; Global minor mode that shows a buffer's build status in the mode line.
 
 ;;; Code:
 
@@ -300,6 +300,34 @@ Signals an error if the response does not contain an HTTP 200 status code."
   :type 'sexp
   :risky t)
 
+(defun build-status--activate-mode ()
+  (let ((root (nth 2 (build-status--project (buffer-file-name)))))
+    (not (null (assoc root build-status--project-status-alist)))))
+
+(defun build-status--toggle-mode (enable)
+  (let* ((project (build-status--project (buffer-file-name)))
+         (root    (nth 2 project)))
+
+    (when (null project)
+      (error "Not a CI project"))
+
+    (when build-status--timer
+      (cancel-timer build-status--timer))
+
+    (if enable
+        (progn
+          (add-to-list 'global-mode-string 'build-status--mode-line-string t)
+          (add-to-list 'build-status--project-status-alist (cons root nil)))
+
+      (setq build-status--project-status-alist
+            (delete (assoc root build-status--project-status-alist)
+                    build-status--project-status-alist)))
+
+    ;; Only remove from the mode line if there are no more projects
+    (if (null build-status--project-status-alist)
+        (delq 'build-status--mode-line-string global-mode-string)
+      (build-status--update-status))))
+
 (defun build-status-open ()
   "Open the CI service's web page for current project's branch."
   (interactive)
@@ -312,30 +340,7 @@ Signals an error if the response does not contain an HTTP 200 status code."
 (define-minor-mode build-status-mode
   "Monitor the build status of the buffer's project."
   :global t
-  (when build-status--timer
-    (cancel-timer build-status--timer))
-
-  (let ((project (build-status--project (buffer-file-name)))
-        root)
-
-    (when (null project)
-      (setq build-status-mode nil)
-      (error "Not a CI project"))
-
-    (setq root (nth 2 project))
-    (if (not build-status-mode)
-        (progn
-          (setq build-status--project-status-alist
-                (delete (assoc root build-status--project-status-alist)
-                        build-status--project-status-alist))
-          ;; Only remove from the mode line if there are no more projects
-          (when (null build-status--project-status-alist)
-            (delq 'build-status--mode-line-string global-mode-string)))
-
-      (add-to-list 'global-mode-string 'build-status--mode-line-string t)
-      (add-to-list 'build-status--project-status-alist (cons root nil))
-
-      (build-status--update-status))))
+  :variable ((build-status--activate-mode) . build-status--toggle-mode))
 
 (provide 'build-status-mode)
 ;;; build-status.el ends here
