@@ -37,15 +37,17 @@
   "Interval at which to check the build status.  Given in seconds, defaults to 300.")
 
 (defvar build-status-color-alist
-  '(("passed"
-     ((background-color . "green")))
-    ("failed"
+  '(("failed"
      ((background-color . "red")))
+    ("passed"
+     ((background-color . "green")))
+    ("queued"
+     ((background-color . "yellow")))
     ("running"
      ((background-color . "yellow"))))
   "Alist of statuses and the face properties to use when displayed.
 Each element looks like (STATUS PROPERTIES).  STATUS is a status
-string (one of: passed, failed, running, or unknown) and PROPERTIES
+string (one of: failed, passed, queued, running, or unknown) and PROPERTIES
 is a list of text property cons.")
 
 (defvar build-status-circle-ci-token nil
@@ -65,7 +67,7 @@ passed, failed, running.")
 (defvar build-status-travis-ci-status-mapping-alist
   '(("errored" . "failed")
     ("started" . "running")
-    ("created" . "queued"))  ;; need to actually handle this state
+    ("created" . "queued"))
   "Alist of TravsCI status to build-status statuses.  build-status statuses are:
 passed, failed, running.")
 
@@ -172,7 +174,7 @@ If `FILENAME' is not part of a CI project return nil."
             (nth 6 project))))
 
 (defun build-status--travis-ci-url (project)
-  (let* ((json (build-status--travis-ci-status-request project))
+  (let* ((json (build-status--travis-ci-branch-request project))
          (build (cdr (assq 'id (assq 'branch json)))))
     (format "https://travis-ci.org/%s/%s/builds/%s"
             (nth 4 project)
@@ -194,15 +196,22 @@ Signals an error if the response does not contain an HTTP 200 status code."
 
 (defun build-status--circle-ci-status (project)
   "Get the Travis CI build status of `PROJECT'."
-  (let* ((url (apply 'format "https://circleci.com/api/v1.1/project/%s/%s/%s/tree/%s?limit=1&circle-token=%s"
-                    `(,@(cdddr project) ,(nth 1 project))))
+  (let* ((url (apply 'format "https://circleci.com/api/v1.1/project/%s/%s/%s/tree/%s?limit=1"
+                     `(,@(cdddr project))))
          (url-request-method "GET")
          (url-request-extra-headers '(("Accept" . "application/json")))
-         (json (build-status--http-request url))
-         (status (or (cdr (assq 'outcome (elt json 0)))
-                     (cdr (assq 'status  (elt json 0))))))
+         (token (nth 1 project))
+         json
+         status)
 
-    (or (cdr (assq status build-status-circle-ci-status-mapping-alist))
+    (when token
+      (setq url (format "%s&circle-token=%s" url token)))
+
+    (setq json (build-status--http-request url))
+    (setq status (or (cdr (assq 'outcome (elt json 0)))
+                     (cdr (assq 'status (elt json 0)))))
+
+    (or (cdr (assoc status build-status-circle-ci-status-mapping-alist))
         status)))
 
 (defun build-status--travis-ci-request (url &optional token)
@@ -215,7 +224,7 @@ Signals an error if the response does not contain an HTTP 200 status code."
 
     (build-status--http-request url)))
 
-(defun build-status--travis-ci-status-request (project)
+(defun build-status--travis-ci-branch-request (project)
   "Get the Travis CI build status of `PROJECT'."
   (let ((url (format "https://api.travis-ci.org/repos/%s/%s/branches/%s"
                      (nth 4 project)
@@ -226,38 +235,44 @@ Signals an error if the response does not contain an HTTP 200 status code."
     (build-status--travis-ci-request url token)))
 
 (defun build-status--travis-ci-status (project)
-  (let* ((json (build-status--travis-ci-status-request project))
+  (let* ((json (build-status--travis-ci-branch-request project))
          (status (cdr (assq 'state (assq 'branch json)))))
 
-    (or (cdr (assq status build-status-travis-ci-status-mapping-alist))
+    (or (cdr (assoc status build-status-travis-ci-status-mapping-alist))
         status)))
 
 (defun build-status--update-status ()
   (let ((buffers (mapcar (lambda (b) (buffer-file-name b)) (buffer-list)))
         config
-        project)
+        project
+        new-status)
 
     (dolist (root (mapcar 'car build-status--project-status-alist))
       (setq config (assoc root build-status--project-status-alist))
       (setq project (build-status--project root))
       (if (and project (build-status--any-open-buffers root buffers))
           (condition-case e
-              (setcdr config (list
-                              (if (eq (car project) 'circle-ci)
-                                  (build-status--circle-ci-status project)
-                                (build-status--travis-ci-status project))))
+              (progn
+                (setq new-status (if (eq (car project) 'circle-ci)
+                                     (build-status--circle-ci-status project)
+                                   (build-status--travis-ci-status project)))
+                ;; Don't show queued state unless we have no prior state
+                ;; Option to control this behavior?
+                (when (or (not (string= new-status "queued"))
+                          (null (cdr config)))
+                  (setcdr config new-status)))
             (error (message "Failed to update status for %s: %s" root (cadr e))))
         (setq build-status--project-status-alist
-              (delete config build-status--project-status-alist)))))
+              (delete config build-status--project-status-alist))))
 
   (force-mode-line-update t)
   (setq build-status--timer
-        (run-at-time build-status-check-interval nil 'build-status--update-status)))
+        (run-at-time build-status-check-interval nil 'build-status--update-status))))
 
 (defun build-status--propertize (lighter status)
   (let ((color (cadr (assoc status build-status-color-alist))))
     (propertize (if color (concat " " lighter " ") lighter)
-                'help-echo (concat "Build status: " status)
+                'help-echo (concat "Build " status)
                 'local-map build-status--mode-line-map
                 'mouse-face 'mode-line-highlight
                 'face color)))
@@ -277,6 +292,8 @@ Signals an error if the response does not contain an HTTP 200 status code."
                   (build-status--propertize "R" status))
                  ((string= status "failed")
                   (build-status--propertize "F" status))
+                 ((string= status "queued")
+                  (build-status--propertize "Q" status))
                  (t
                   (build-status--propertize "?" (or status "unknown"))))))))
   "Build status mode line string."

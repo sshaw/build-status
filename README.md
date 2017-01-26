@@ -28,10 +28,12 @@ Each status has associated text properties. These are configured
 via `build-status-color-alist`. By default it contains:
 
 ```el
-'(("passed"
-   ((background-color . "green")))
-  ("failed"
+'(("failed"
    ((background-color . "red")))
+  ("passed"
+   ((background-color . "green")))
+  ("queued"
+   ((background-color . "yellow")))
   ("running"
    ((background-color . "yellow"))))
 ```
@@ -60,8 +62,9 @@ The buffer's file or one of its descendant directories must contain a `.travis.y
 
 ## TODOs
 
-* Status for queued state (maybe)
+* Support for Enterprise GitHub
 * Support for TravisCI Pro and Enterprise
+* Support for VCS mode hooks
 * Support for AppVeyor
 
 ## See Also
