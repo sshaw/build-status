@@ -65,14 +65,16 @@ The API token can also be sit via: `git config --add build-status.api-token`.")
     ("scheduled" . "queued")
     ("timedout" . "failed"))
   "Alist of CircleCI status to build-status statuses.
-build-status statuses are: failed, passed, queued, running.")
+build-status statuses are: failed, passed, queued, running.
+When set to the symbol `ignored' the status will be ignored")
 
 (defvar build-status-travis-ci-status-mapping-alist
   '(("errored" . "failed")
     ("started" . "running")
     ("created" . "queued"))
   "Alist of TravsCI status to build-status statuses.
-build-status statuses are: failed, passed, queued, running.")
+build-status statuses are: failed, passed, queued, running.
+When set to the symbol `ignored' the status will be ignored")
 
 (defvar build-status--project-status-alist '()
   "Alist of project roots and their build status.")
@@ -261,8 +263,9 @@ Signals an error if the response does not contain an HTTP 200 status code."
                                    (build-status--travis-ci-status project)))
                 ;; Don't show queued state unless we have no prior state
                 ;; Option to control this behavior?
-                (when (or (not (string= new-status "queued"))
-                          (null (cdr config)))
+                (when (and (not (eq new-status 'ignore))
+                           (or (not (string= new-status "queued"))
+                               (null (cdr config))))
                   (setcdr config new-status)))
             (error (message "Failed to update status for %s: %s" root (cadr e))))
         (setq build-status--project-status-alist
