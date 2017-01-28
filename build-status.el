@@ -59,17 +59,20 @@ The API token can also be sit via: `git config --add build-status.api-token`.")
 The API token can also be sit via: `git config --add build-status.api-token`.")
 
 (defvar build-status-circle-ci-status-mapping-alist
-  '(("success"   . "passed")
-    ("scheduled" . "queued"))
-  "Alist of CircleCI status to build-status statuses. build-status statuses are:
-passed, failed, running.")
+  '(("infrastructure_fail" . "failed")
+    ("not_running" . "queued")
+    ("success" . "passed")
+    ("scheduled" . "queued")
+    ("timedout" . "failed"))
+  "Alist of CircleCI status to build-status statuses.
+build-status statuses are: failed, passed, queued, running.")
 
 (defvar build-status-travis-ci-status-mapping-alist
   '(("errored" . "failed")
     ("started" . "running")
     ("created" . "queued"))
-  "Alist of TravsCI status to build-status statuses.  build-status statuses are:
-passed, failed, running.")
+  "Alist of TravsCI status to build-status statuses.
+build-status statuses are: failed, passed, queued, running.")
 
 (defvar build-status--project-status-alist '()
   "Alist of project roots and their build status.")
@@ -295,7 +298,8 @@ Signals an error if the response does not contain an HTTP 200 status code."
                  ((string= status "queued")
                   (build-status--propertize "Q" status))
                  (t
-                  (build-status--propertize "?" (or status "unknown"))))))))
+                  (build-status--propertize "?" (replace-regexp-in-string "[^a-zA-Z0-9[:space:]]+" " "
+                                                                          (or status "unknown")))))))))
   "Build status mode line string."
   :type 'sexp
   :risky t)
