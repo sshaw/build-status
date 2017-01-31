@@ -200,7 +200,7 @@ Signals an error if the response does not contain an HTTP 200 status code."
     (json-read)))
 
 (defun build-status--circle-ci-status (project)
-  "Get the Travis CI build status of `PROJECT'."
+  "Get the Circle CI build status of `PROJECT'."
   (let* ((url (apply 'format "https://circleci.com/api/v1.1/project/%s/%s/%s/tree/%s?limit=1"
                      `(,@(cdddr project))))
          (url-request-method "GET")
@@ -213,11 +213,13 @@ Signals an error if the response does not contain an HTTP 200 status code."
       (setq url (format "%s&circle-token=%s" url token)))
 
     (setq json (build-status--http-request url))
-    (setq status (or (cdr (assq 'outcome (elt json 0)))
-                     (cdr (assq 'status (elt json 0)))))
+    ;; When branch is not found a 200 is returned but the array is empty
+    (when (> (length json) 0)
+      (setq status (or (cdr (assq 'outcome (elt json 0)))
+                       (cdr (assq 'status (elt json 0)))))
 
-    (or (cdr (assoc status build-status-circle-ci-status-mapping-alist))
-        status)))
+      (or (cdr (assoc status build-status-circle-ci-status-mapping-alist))
+          status))))
 
 (defun build-status--travis-ci-request (url &optional token)
   "Generic Travis CI request to `URL' using `TOKEN', if given."
