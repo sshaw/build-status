@@ -134,7 +134,7 @@ When set to the symbol `ignored' the status will be ignored")
                             (eq t
                                 ;; prefer compare-string as it's not strict with bounds like substring
                                 (compare-strings start-with 0 (length start-with)
-                                                 (or buffer "") 0 (length start-with)))))))
+                                                 buffer 0 (length start-with)))))))
 
 (defun build-status--project (filename)
   "Return a list containing information on `FILENAME''s CI project.
@@ -249,7 +249,7 @@ Signals an error if the response does not contain an HTTP 200 status code."
         status)))
 
 (defun build-status--update-status ()
-  (let ((buffers (mapcar (lambda (b) (buffer-file-name b)) (buffer-list)))
+  (let ((buffers (delq nil (mapcar 'buffer-file-name (buffer-list))))
         config
         project
         new-status)
