@@ -285,7 +285,7 @@ Signals an error if the response does not contain an HTTP 200 status code."
                 'mouse-face 'mode-line-highlight
                 'face color)))
 
-(defcustom build-status--mode-line-string
+(defvar build-status-mode-line-string
   '(:eval
     (let* ((root (or (build-status--circle-ci-project-root (buffer-file-name))
                      (build-status--travis-ci-project-root (buffer-file-name))))
@@ -305,9 +305,8 @@ Signals an error if the response does not contain an HTTP 200 status code."
                  (t
                   (build-status--propertize "?" (replace-regexp-in-string "[^a-zA-Z0-9[:space:]]+" " "
                                                                           (or status "unknown")))))))))
-  "Build status mode line string."
-  :type 'sexp
-  :risky t)
+  "Build status mode line string.")
+;;;###autoload (put 'build-status-mode-line-string 'risky-local-variable t)
 
 (defun build-status--activate-mode ()
   (let ((root (nth 2 (build-status--project (buffer-file-name)))))
@@ -325,7 +324,7 @@ Signals an error if the response does not contain an HTTP 200 status code."
 
     (if enable
         (progn
-          (add-to-list 'global-mode-string 'build-status--mode-line-string t)
+          (add-to-list 'global-mode-string 'build-status-mode-line-string t)
           (add-to-list 'build-status--project-status-alist (cons root nil)))
 
       (setq build-status--project-status-alist
@@ -334,7 +333,7 @@ Signals an error if the response does not contain an HTTP 200 status code."
 
     ;; Only remove from the mode line if there are no more projects
     (if (null build-status--project-status-alist)
-        (delq 'build-status--mode-line-string global-mode-string)
+        (delq 'build-status-mode-line-string global-mode-string)
       (build-status--update-status))))
 
 (defun build-status-open ()
