@@ -346,6 +346,7 @@ Signals an error if the response does not contain an HTTP 200 status code."
                     (build-status--circle-ci-url project)
                     (build-status--travis-ci-url project))))))
 
+;;;###autoload
 (define-minor-mode build-status-mode
   "Monitor the build status of the buffer's project."
   :global t
