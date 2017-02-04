@@ -102,7 +102,7 @@ When set to the symbol `ignored' the status will be ignored")
 
 (defface build-status-unknown-face
   '((t . (:inherit 'build-status-face)))
-  "Face for unknown build indicator"
+  "Face for unknown build status indicator"
   :group 'build-status)
 
 (defun build-status--git(&rest args)
