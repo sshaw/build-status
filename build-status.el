@@ -1,5 +1,6 @@
 ;;; build-status.el --- Mode line build status indicator
 
+;; Copyright (C) 2017 Skye Shaw
 ;; Author: Skye Shaw <skye.shaw@gmail.com>
 ;; Version: 0.0.1
 ;; Keywords: mode-line, ci, circleci, travis-ci
@@ -36,20 +37,6 @@
 (defvar build-status-check-interval 300
   "Interval at which to check the build status.  Given in seconds, defaults to 300.")
 
-(defvar build-status-color-alist
-  '(("failed"
-     ((background-color . "red")))
-    ("passed"
-     ((background-color . "green")))
-    ("queued"
-     ((background-color . "yellow")))
-    ("running"
-     ((background-color . "yellow"))))
-  "Alist of statuses and the face properties to use when displayed.
-Each element looks like (STATUS PROPERTIES).  STATUS is a status
-string (one of: failed, passed, queued, running, or unknown) and PROPERTIES
-is a list of text property cons.")
-
 (defvar build-status-circle-ci-token nil
   "CircleCI API token.
 The API token can also be sit via: `git config --add build-status.api-token`.")
@@ -85,6 +72,38 @@ When set to the symbol `ignored' the status will be ignored")
 
 (defvar build-status--mode-line-map (make-sparse-keymap))
 (define-key build-status--mode-line-map [mode-line mouse-1] 'build-status-open)
+
+(defgroup build-status nil
+  "Mode line build status indicator")
+
+(defface build-status-face nil
+  "Faces for build status indicators"
+  :group 'build-status)
+
+(defface build-status-failed-face
+  '((t . (:inherit 'build-status-face :background "red")))
+  "Face for failed build indicator"
+  :group 'build-status)
+
+(defface build-status-passed-face
+  '((t . (:inherit 'build-status-face :background "green")))
+  "Face for passed build indicator"
+  :group 'build-status)
+
+(defface build-status-queued-face
+  '((t . (:inherit 'build-status-face :background "yellow")))
+  "Face for queued build indicator"
+  :group 'build-status)
+
+(defface build-status-running-face
+  '((t . (:inherit 'build-status-face :background "yellow")))
+  "Face for running build indicator"
+  :group 'build-status)
+
+(defface build-status-unknown-face
+  '((t . (:inherit 'build-status-face)))
+  "Face for unknown build indicator"
+  :group 'build-status)
 
 (defun build-status--git(&rest args)
   (car (apply 'process-lines `("git" ,@(when args args)))))
@@ -171,7 +190,6 @@ If `FILENAME' is not part of a CI project return nil."
 
 (defun build-status--circle-ci-url (project)
   (let ((root (if (string= "github" (nth 3 project)) "gh" "bb")))
-    ;; "bb" here is just a guess for Bitbucket :)
     (format "https://circleci.com/%s/%s/%s/tree/%s"
             root
             (nth 4 project)
@@ -278,12 +296,12 @@ Signals an error if the response does not contain an HTTP 200 status code."
         (run-at-time build-status-check-interval nil 'build-status--update-status))))
 
 (defun build-status--propertize (lighter status)
-  (let ((color (cadr (assoc status build-status-color-alist))))
-    (propertize (if color (concat " " lighter " ") lighter)
+  (let ((face (intern (format "build-status-%s-face" status))))
+    (propertize (if (face-differs-from-default-p face) (concat " " lighter " ") lighter)
                 'help-echo (concat "Build " status)
                 'local-map build-status--mode-line-map
                 'mouse-face 'mode-line-highlight
-                'face color)))
+                'face face)))
 
 (defvar build-status-mode-line-string
   '(:eval

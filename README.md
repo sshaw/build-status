@@ -22,7 +22,7 @@ git config --add build-status.api-token TOKEN
 To open the CI service's web page for buffer's build click on the mode's lighter or
 run `M-x build-status-open`.
 
-### Status Mapping
+## Status Mapping
 
 `build-status` will try to convert the CI service's status to one of the following:
 
@@ -36,29 +36,46 @@ This is done via the service's status mapping alist.
 If the status is not mapped it's treated as unknown (lighter is `"?"` and mouseover shows
 the status as is). You can ignore a status by mapping it to the symbol `ignored`.
 
-See the service's section below for more information.
+See the [Supported Services section](#supported-services) below for more information.
 
-### Status Text Properties
+## Status Mode Line Faces
 
-Each status has associated text properties. These are configured
-via `build-status-color-alist`. By default it contains:
+Each status indicator has an associated face. They're are listed below.
 
-```el
-'(("failed"
-   ((background-color . "red")))
-  ("passed"
-   ((background-color . "green")))
-  ("queued"
-   ((background-color . "yellow")))
-  ("running"
-   ((background-color . "yellow"))))
-```
+If you'd like to change the color and/or style of an indicator just
+[update the appropriate face](https://www.gnu.org/software/emacs/manual/html_node/elisp/Attribute-Functions.html#Attribute-Functions).
 
-Each value is a list of text (`face`) properties. Set them as you see fit.
+### `build-status-face`
 
-### Supported Services
+All faces inherit from this face.
 
-#### CircleCI
+Attributes: none
+
+### `build-status-failed-face`
+
+Attributes: `:background "red"`
+
+### `build-status-passed-face`
+
+Attributes: `:background "green"`
+
+### `build-status-queued-face`
+
+Attributes: `:background "yellow"`
+
+### `build-status-running-face`
+
+Attributes: `:background "yellow"`
+
+### `build-status-unknown-face`
+
+Used when the build status returns an unknown value. For more info see [status mapping](#status-mapping).
+
+Attributes: none
+
+## Supported Services
+
+### CircleCI
 
 The buffer's directory or one of its ancestors must contain a `circle.yml` file.
 
@@ -79,7 +96,7 @@ defaults to:
   ("timedout" . "failed"))
 ```
 
-#### Travis CI
+### Travis CI
 
 **Pro and Enterprise not supported. Pull requests welcome!**
 
@@ -111,3 +128,7 @@ defaults to:
 
 * [jenkins-watch](https://github.com/ataylor284/jenkins-watch)
 * [github-notifier](https://github.com/xuchunyang/github-notifier.el)
+
+## Author
+
+Skye Shaw [skye.shaw AT gmail.com]
