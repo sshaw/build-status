@@ -76,7 +76,8 @@ When set to the symbol `ignored' the status will be ignored")
 (defgroup build-status nil
   "Mode line build status indicator")
 
-(defface build-status-face nil
+(defface build-status-face
+  '((t . (:inherit 'mode-line)))
   "Faces for build status indicators"
   :group 'build-status)
 
