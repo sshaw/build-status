@@ -296,8 +296,15 @@ Signals an error if the response does not contain an HTTP 200 status code."
   (setq build-status--timer
         (run-at-time build-status-check-interval nil 'build-status--update-status))))
 
+(defun build-status--select-face (status)
+  (let ((face (intern (format "build-status-%s-face"
+                              (replace-regexp-in-string "[[:space:]]+" "-" status)))))
+    (when (not (facep face))
+      (setq face 'build-status-unknown-face))
+    face))
+
 (defun build-status--propertize (lighter status)
-  (let ((face (intern (format "build-status-%s-face" status))))
+  (let ((face (build-status--select-face status)))
     (propertize (if (face-differs-from-default-p face) (concat " " lighter " ") lighter)
                 'help-echo (concat "Build " status)
                 'local-map build-status--mode-line-map

@@ -45,6 +45,9 @@ Each status indicator has an associated face. They're are listed below.
 If you'd like to change the color and/or style of an indicator just
 [update the appropriate face](https://www.gnu.org/software/emacs/manual/html_node/elisp/Attribute-Functions.html#Attribute-Functions).
 
+You can add a face for a new status but creating a face named `build-status-STATUS-face` where `STATUS` is the name of the
+status with non-word characters replaced by "-".
+
 ### `build-status-face`
 
 All faces inherit from this face.
