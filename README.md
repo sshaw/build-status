@@ -2,9 +2,9 @@
 
 Emacs minor mode that shows a buffer's build status in the mode line.
 
-![build-status example passing](example1.png)
-
-![build-status example failing](example2.png)
+![build-status example running](example-running.png)
+![build-status example passing](example-passing.png)
+![build-status example failing](example-failing.png)
 
 ## Usage
 
