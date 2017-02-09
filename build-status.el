@@ -1,4 +1,4 @@
-;;; build-status.el --- Mode line build status indicator
+;;; build-status.el --- Mode line build status indicator -*- lexical-binding: t; -*-
 
 ;; Copyright (C) 2017 Skye Shaw
 ;; Author: Skye Shaw <skye.shaw@gmail.com>
@@ -74,7 +74,8 @@ When set to the symbol `ignored' the status will be ignored")
 (define-key build-status--mode-line-map [mode-line mouse-1] 'build-status-open)
 
 (defgroup build-status nil
-  "Mode line build status indicator")
+  "Mode line build status indicator"
+  :group 'programming)
 
 (defface build-status-face
   '((t . (:inherit 'mode-line)))
