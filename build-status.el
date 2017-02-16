@@ -3,7 +3,7 @@
 ;; Copyright (C) 2017 Skye Shaw
 ;; Author: Skye Shaw <skye.shaw@gmail.com>
 ;; Version: 0.0.1
-;; Keywords: mode-line, ci, circleci, travis-ci
+;; Keywords: mode-line, ci, test, circleci, travis-ci, appveyor
 ;; Package-Requires: ((cl-lib "0.5"))
 ;; URL: http://github.com/sshaw/build-status
 
@@ -45,6 +45,10 @@ The API token can also be sit via: `git config --add build-status.api-token`.")
   "Travis CI API token.
 The API token can also be sit via: `git config --add build-status.api-token`.")
 
+(defvar build-status-appveyor-token nil
+  "Appveyor API token.
+The API token can also be sit via: `git config --add build-status.api-token`.")
+
 (defvar build-status-circle-ci-status-mapping-alist
   '(("infrastructure_fail" . "failed")
     ("not_running" . "queued")
@@ -60,6 +64,12 @@ When set to the symbol `ignored' the status will be ignored")
     ("started" . "running")
     ("created" . "queued"))
   "Alist of TravsCI status to build-status statuses.
+build-status statuses are: failed, passed, queued, running.
+When set to the symbol `ignored' the status will be ignored")
+
+(defvar build-status-appveyor-status-mapping-alist
+  '(("success" . "passed"))
+  "Alist of Appveyor status to build-status statuses.
 build-status statuses are: failed, passed, queued, running.
 When set to the symbol `ignored' the status will be ignored")
 
@@ -170,7 +180,10 @@ If `FILENAME' is not part of a CI project return nil."
       (setq token build-status-circle-ci-token))
      ((setq root (build-status--travis-ci-project-root filename))
       (setq project 'travis-ci)
-      (setq token build-status-travis-ci-token)))
+      (setq token build-status-travis-ci-token))
+     ((setq root (build-status--appveyor-project-root filename))
+      (setq project 'appveyor)
+      (setq token build-status-appveyor-token)))
 
     (when root
       (setq branch (build-status--branch root))
@@ -181,7 +194,9 @@ If `FILENAME' is not part of a CI project return nil."
               root
               (match-string 1 remote)
               (match-string 2 remote)
-              (match-string 3 remote)
+              (if (eq project 'appveyor)
+                  (replace-regexp-in-string "_+" "-" (match-string 3 remote))
+                (match-string 3 remote))
               branch)))))
 
 (defun build-status--circle-ci-project-root (path)
@@ -189,6 +204,9 @@ If `FILENAME' is not part of a CI project return nil."
 
 (defun build-status--travis-ci-project-root (path)
   (build-status--project-root path ".travis.yml"))
+
+(defun build-status--appveyor-project-root (path)
+  (build-status--project-root path "appveyor.yml"))
 
 (defun build-status--circle-ci-url (project)
   (let ((root (if (string= "github" (nth 3 project)) "gh" "bb")))
@@ -202,6 +220,14 @@ If `FILENAME' is not part of a CI project return nil."
   (let* ((json (build-status--travis-ci-branch-request project))
          (build (cdr (assq 'id (assq 'branch json)))))
     (format "https://travis-ci.org/%s/%s/builds/%s"
+            (nth 4 project)
+            (nth 5 project)
+            build)))
+
+(defun build-status--appveyor-url (project)
+  (let* ((json (build-status--appveyor-branch-request project))
+         (build (cdr (assq 'version (assq 'build json)))))
+    (format "https://ci.appveyor.com/project/%s/%s/build/%s"
             (nth 4 project)
             (nth 5 project)
             build)))
@@ -297,6 +323,27 @@ Signals an error if the response does not contain an HTTP 200 status code."
   (setq build-status--timer
         (run-at-time build-status-check-interval nil 'build-status--update-status))))
 
+(defun build-status--appveyor-branch-request (project)
+  (let ((url (format "https://ci.appveyor.com/api/projects/%s/%s/branch/%s"
+                     (nth 4 project)
+                     (nth 5 project)
+                     (nth 6 project)))
+        (url-request-method "GET")
+        (url-request-extra-headers '(("Accept" . "application/json")))
+        (token (nth 1 project)))
+
+    (when token
+      (push (cons "Authorization" (format "Baerer %s" token)) url-request-extra-headers))
+
+    (build-status--http-request url)))
+
+(defun build-status--appveyor-status (project)
+  (let* ((json (build-status--appveyor-branch-request project))
+         (status (cdr (assq 'status (assq 'build json)))))
+
+    (or (cdr (assoc status build-status-appveyor-status-mapping-alist))
+        status)))
+
 (defun build-status--select-face (status)
   (let ((face (intern (format "build-status-%s-face"
                               (replace-regexp-in-string "[[:space:]]+" "-" status)))))
@@ -366,11 +413,11 @@ Signals an error if the response does not contain an HTTP 200 status code."
 (defun build-status-open ()
   "Open the CI service's web page for current project's branch."
   (interactive)
-  (let ((project (build-status--project (buffer-file-name))))
+  (let* ((project (build-status--project (buffer-file-name)))
+         (service (car project)))
     (when project
-      (browse-url (if (eq 'circle-ci (car project))
-                    (build-status--circle-ci-url project)
-                    (build-status--travis-ci-url project))))))
+      (browse-url (funcall (intern (format "build-status--%s-url" service))
+                           project)))))
 
 ;;;###autoload
 (define-minor-mode build-status-mode
