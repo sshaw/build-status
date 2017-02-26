@@ -378,5 +378,5 @@ Signals an error if the response does not contain an HTTP 200 status code."
   :global t
   :variable ((build-status--activate-mode) . build-status--toggle-mode))
 
-(provide 'build-status-mode)
+(provide 'build-status)
 ;;; build-status.el ends here
