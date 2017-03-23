@@ -212,7 +212,7 @@ Signals an error if the response does not contain an HTTP 200 status code."
   (with-current-buffer (url-retrieve-synchronously url)
     ;; (message "%s\n%s" url (buffer-substring-no-properties 1 (point-max)))
     (goto-char (point-min))
-    (when (and (search-forward-regexp "HTTP/1\\.[01] \\([0-9]\\{3\\}\\)")
+    (when (and (search-forward-regexp "HTTP/1\\.[01] \\([0-9]\\{3\\}\\)" nil t)
                (not (string= (match-string 1) "200")))
       (error "Request to %s failed with HTTP status %s" url (match-string 1)))
 
