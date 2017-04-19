@@ -375,7 +375,6 @@ Signals an error if the response does not contain an HTTP 200 status code."
 ;;;###autoload
 (define-minor-mode build-status-mode
   "Monitor the build status of the buffer's project."
-  :global t
   :variable ((build-status--activate-mode) . build-status--toggle-mode))
 
 (provide 'build-status)
