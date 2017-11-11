@@ -2,7 +2,7 @@
 
 ;; Copyright (C) 2017 Skye Shaw
 ;; Author: Skye Shaw <skye.shaw@gmail.com>
-;; Version: 0.0.2
+;; Version: 0.0.3 (unreleased)
 ;; Keywords: mode-line, ci, circleci, travis-ci
 ;; Package-Requires: ((cl-lib "0.5"))
 ;; URL: http://github.com/sshaw/build-status
@@ -145,13 +145,9 @@ When set to the symbol `ignored' the status will be ignored")
 
 (defun build-status--project-root (path looking-for)
   (when path
-    (setq path (file-name-as-directory path))
-    (if (file-exists-p (concat path looking-for))
-        path
-      ;; Make sure we're not at the root directory
-      (when (not (string= path (directory-file-name path)))
-        (build-status--project-root (file-name-directory (directory-file-name path))
-                                    looking-for)))))
+    (setq path (locate-dominating-file path looking-for))
+    (when path
+      (expand-file-name path))))
 
 (defun build-status--any-open-buffers (root buffers)
   (stringp (cl-find root

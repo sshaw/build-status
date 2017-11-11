@@ -6,6 +6,21 @@ Emacs minor mode that shows a buffer's build status in the mode line.
 ![build-status example passing](example-passing.png)
 ![build-status example failing](example-failing.png)
 
+## Installation
+
+From MELPA
+
+Run `M-x package-install` `build-status`
+
+Manual installation
+
+Add `build-status.el`'s directory to `load-path`
+
+```el
+(require 'build-status)
+(put 'build-status-mode-line-string 'risky-local-variable t)
+```
+
 ## Usage
 
 `M-x build-status-mode` in a buffer that's part of a CI project.
@@ -80,7 +95,7 @@ Attributes: none
 
 ### CircleCI
 
-The buffer's directory or one of its ancestors must contain a `circle.yml` file.
+The buffer's directory or one of its ancestors must contain a `circle.yml` file or `.circleci` directory.
 
 To set a token (but also see [`git config` tokens](#usage)):
 
