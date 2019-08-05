@@ -116,8 +116,6 @@ defaults to:
 
 ### Travis CI
 
-**Pro and Enterprise not supported. Pull requests welcome!**
-
 The buffer's directory or one of its ancestors must contain a `.travis.yml` file.
 
 To set a token (but also see [`git config` tokens](#usage)):
@@ -135,10 +133,16 @@ defaults to:
   ("created" . "queued"))
 ```
 
+By default, the open source Travis CI (travis-ci.org) is used. To use the pro or
+enterprise versions, set the `build-status-travis-ci-domain` variable to
+`travis-ci.com`, or the domain of your enterprise instance. If you have projects
+in both, [directory
+variables](https://www.gnu.org/software/emacs/manual/html_node/emacs/Directory-Variables.html#Directory-Variables)
+are a good way to set up domain and token on a per-project basis.
+
 ## TODOs
 
 * Support for Enterprise GitHub
-* Support for TravisCI Pro and Enterprise
 * Support for VCS mode hooks
 * Support for AppVeyor
 
