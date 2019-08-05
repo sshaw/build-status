@@ -149,14 +149,10 @@ When set to the symbol `ignored' the status will be ignored")
     (when path
       (expand-file-name path))))
 
-(defun build-status--any-open-buffers (root buffers)
-  (stringp (cl-find root
-                    buffers
-                    :test (lambda (start-with buffer)
-                            (eq t
-                                ;; prefer compare-string as it's not strict with bounds like substring
-                                (compare-strings start-with 0 (length start-with)
-                                                 buffer 0 (length start-with)))))))
+(defun build-status--first-open-buffer (root buffers)
+  (seq-find (lambda (buffer)
+              (string-prefix-p root (buffer-file-name buffer)))
+            buffers))
 
 (defun build-status--project (filename)
   "Return a list containing information on `FILENAME''s CI project.
@@ -271,17 +267,19 @@ Signals an error if the response does not contain an HTTP 200 status code."
         status)))
 
 (defun build-status--update-status ()
-  (let ((buffers (delq nil (mapcar 'buffer-file-name (buffer-list))))
+  (let ((buffers (buffer-list))
         config
         project
+        buffer
         new-status)
 
     (dolist (root (mapcar 'car build-status--project-status-alist))
       (setq config (assoc root build-status--project-status-alist))
       (setq project (build-status--project root))
-      (if (and project (build-status--any-open-buffers root buffers))
+      (setq buffer (build-status--first-open-buffer root buffers))
+      (if (and project buffer)
           (condition-case e
-              (progn
+              (with-current-buffer buffer
                 (setq new-status (if (eq (car project) 'circle-ci)
                                      (build-status--circle-ci-status project)
                                    (build-status--travis-ci-status project)))
